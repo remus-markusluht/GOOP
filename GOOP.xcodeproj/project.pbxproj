@@ -13,10 +13,23 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		8A27E50030647B7600239D46 /* GOOP */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				8A27E50C30647B7700239D46 /* Info plist excluded from resources */,
+			);
 			path = GOOP;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		8A27E50C30647B7700239D46 /* Info plist excluded from resources */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				GOOP-Info.plist,
+			);
+			target = 8A27E4FD30647B7600239D46 /* GOOP */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		8A27E4FB30647B7600239D46 /* Frameworks */ = {
@@ -242,7 +255,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				GOOP_API_BASE_URL = "http://127.0.0.1:8787";
+				INFOPLIST_FILE = "GOOP/GOOP-Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -273,7 +288,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				GOOP_API_BASE_URL = "https://REPLACE_WITH_YOUR_GOOP_SERVER";
+				INFOPLIST_FILE = "GOOP/GOOP-Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

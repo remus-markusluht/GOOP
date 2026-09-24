@@ -9,9 +9,11 @@ import SwiftUI
 
 @main
 struct GOOPApp: App {
+    private let session = GOOPSession()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(session: session)
         }
     }
 }

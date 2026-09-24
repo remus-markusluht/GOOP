@@ -1,0 +1,8 @@
+.DS_Store
+DerivedData/
+*.xcuserstate
+xcuserdata/
+server/.env
+server/.env.*
+!server/.env.example
+server/data/

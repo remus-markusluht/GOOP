@@ -1,24 +1,29 @@
-//
-//  ContentView.swift
-//  GOOP
-//
-//  Created by Remus-Markus Luht on 24.09.2026.
-//
-
 import SwiftUI
 
 struct ContentView: View {
-    var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
-    }
-}
+    @ObservedObject var session: GOOPSession
 
-#Preview {
-    ContentView()
+    init(session: GOOPSession) { self.session = session }
+
+    var body: some View {
+        Group {
+            switch session.state {
+            case .signedOut, .connecting:
+                SignInView(state: session.state, action: session.signIn)
+            case .failed(let message):
+                SignInView(state: .failed(message), action: session.signIn)
+            case .loading:
+                LoadingView()
+            case .connected:
+                TabView {
+                    DashboardView(session: session).tabItem { Label("Today", systemImage: "circle.grid.2x2.fill") }
+                    TrendsView(snapshot: session.snapshot).tabItem { Label("Trends", systemImage: "chart.xyaxis.line") }
+                    SleepView(snapshot: session.snapshot).tabItem { Label("Sleep", systemImage: "moon.zzz") }
+                    ProfileView(snapshot: session.snapshot, signOut: session.signOut).tabItem { Label("You", systemImage: "person.crop.circle") }
+                }
+                .tint(GoopStyle.ink)
+            }
+        }
+        .background(GoopStyle.canvas.ignoresSafeArea())
+    }
 }
