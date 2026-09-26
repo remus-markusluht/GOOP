@@ -4,6 +4,7 @@ struct HealthSnapshot: Decodable {
     let user: GOOPUser
     let generatedAt: Date
     let days: [HealthDay]
+    let workouts: [WorkoutSummary]?
 }
 
 struct GOOPUser: Decodable {
@@ -21,9 +22,6 @@ struct HealthDay: Decodable, Identifiable {
 
     var id: String { date }
 
-    var activityLoad: Int? {
-        HealthScoreCalculator.activityLoad(activeZoneMinutes: activeZoneMinutes)
-    }
 }
 
 struct SleepSummary: Decodable {
@@ -35,6 +33,20 @@ struct SleepSummary: Decodable {
     let remMinutes: Int?
     let lightMinutes: Int?
     let awakeMinutes: Int?
+}
+
+struct WorkoutSummary: Decodable, Identifiable {
+    let id: String
+    let startTime: Date
+    let endTime: Date
+    let name: String
+    let type: String
+    let activeDurationSeconds: Int?
+    let distanceMeters: Double?
+    let calories: Double?
+    let steps: Int?
+    let averageHeartRate: Int?
+    let activeZoneMinutes: Int?
 }
 
 enum GOOPConnectionState: Equatable {

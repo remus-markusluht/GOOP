@@ -4,19 +4,46 @@ struct DashboardView: View {
     @ObservedObject var session: GOOPSession
 
     private var snapshot: HealthSnapshot? { session.snapshot }
-    private var today: HealthDay? { snapshot?.days.first }
+    private var today: HealthDay? {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd"
+        let localDate = formatter.string(from: .now)
+        return snapshot?.days.first { $0.date == localDate }
+    }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 20) {
                 header
                 if let today {
-                    recoveryCard(today)
-                    HStack(spacing: 12) {
-                        MetricCard(title: "Activity load", value: today.activityLoad.map(String.init) ?? "—", caption: "From active zone minutes", icon: "flame.fill")
-                        MetricCard(title: "Sleep", value: sleepDuration(today.sleep?.minutesAsleep), caption: "Last recorded session", icon: "moon.zzz.fill")
+                    NavigationLink {
+                        ReadinessDetailView(day: today, history: snapshot?.days ?? [])
+                    } label: {
+                        recoveryCard(today)
                     }
-                    activityCard(today)
+                    .buttonStyle(.plain)
+                    HStack(spacing: 12) {
+                        NavigationLink {
+                            MetricDetailView(metric: .activeZoneMinutes, snapshot: snapshot)
+                        } label: {
+                            MetricCard(title: "Zone minutes", value: today.activeZoneMinutes.map(String.init) ?? "—", caption: "Google Health total", icon: "flame.fill")
+                        }
+                        .buttonStyle(.plain)
+                        NavigationLink {
+                            MetricDetailView(metric: .sleep, snapshot: snapshot)
+                        } label: {
+                            MetricCard(title: "Sleep", value: sleepDuration(today.sleep?.minutesAsleep), caption: "Latest session", icon: "moon.zzz.fill")
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    NavigationLink {
+                        MetricDetailView(metric: .steps, snapshot: snapshot)
+                    } label: {
+                        activityCard(today)
+                    }
+                    .buttonStyle(.plain)
                     coachingCard(today)
                 } else {
                     NoDataMessage(title: "No synced health data yet", detail: "Open Google Health, sync your Fitbit Air, then pull down here to refresh.")
@@ -91,8 +118,8 @@ struct DashboardView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("ACTIVITY").font(.system(size: 10, weight: .bold, design: .rounded)).tracking(1.2).foregroundStyle(GoopStyle.muted)
-                        Text("Movement recorded today").font(.system(size: 15, weight: .semibold, design: .rounded))
+                        Text("TODAY’S MOVEMENT").font(.system(size: 10, weight: .bold, design: .rounded)).tracking(1.2).foregroundStyle(GoopStyle.muted)
+                        Text("Steps and zone minutes").font(.system(size: 15, weight: .semibold, design: .rounded))
                     }
                     Spacer()
                     Image(systemName: "figure.walk").foregroundStyle(GoopStyle.muted)
@@ -104,6 +131,13 @@ struct DashboardView: View {
                     Text(day.activeZoneMinutes.map { "\($0) AZM" } ?? "— AZM")
                         .font(.system(size: 10, weight: .bold, design: .rounded)).foregroundStyle(GoopStyle.muted)
                 }
+                HStack {
+                    Text("Open daily movement")
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                }
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(GoopStyle.muted)
             }
         }
     }

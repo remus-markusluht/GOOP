@@ -16,10 +16,16 @@ struct ContentView: View {
                 LoadingView()
             case .connected:
                 TabView {
-                    DashboardView(session: session).tabItem { Label("Today", systemImage: "circle.grid.2x2.fill") }
-                    TrendsView(snapshot: session.snapshot).tabItem { Label("Trends", systemImage: "chart.xyaxis.line") }
-                    SleepView(snapshot: session.snapshot).tabItem { Label("Sleep", systemImage: "moon.zzz") }
-                    ProfileView(snapshot: session.snapshot, signOut: session.signOut).tabItem { Label("You", systemImage: "person.crop.circle") }
+                    NavigationStack { DashboardView(session: session) }
+                        .tabItem { Label("Today", systemImage: "circle.grid.2x2.fill") }
+                    NavigationStack { WorkoutsView(snapshot: session.snapshot) }
+                        .tabItem { Label("Train", systemImage: "figure.run") }
+                    NavigationStack { TrendsView(snapshot: session.snapshot) }
+                        .tabItem { Label("Trends", systemImage: "chart.xyaxis.line") }
+                    NavigationStack { SleepView(snapshot: session.snapshot) }
+                        .tabItem { Label("Sleep", systemImage: "moon.zzz") }
+                    NavigationStack { ProfileView(snapshot: session.snapshot, signOut: session.signOut) }
+                        .tabItem { Label("You", systemImage: "person.crop.circle") }
                 }
                 .tint(GoopStyle.ink)
             }

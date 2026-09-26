@@ -210,7 +210,7 @@ async function listDataPoints(accessToken, dataType, startFilter = null) {
   let pageToken = '';
   do {
     const endpoint = new URL(`https://health.googleapis.com/v4/users/me/dataTypes/${dataType}/dataPoints`);
-    endpoint.searchParams.set('pageSize', '10000');
+    endpoint.searchParams.set('pageSize', dataType === 'sleep' || dataType === 'exercise' ? '25' : '10000');
     if (pageToken) endpoint.searchParams.set('pageToken', pageToken);
     if (startFilter) endpoint.searchParams.set('filter', startFilter);
     const response = await fetch(endpoint, { headers: { authorization: `Bearer ${accessToken}`, accept: 'application/json' } });
@@ -223,6 +223,54 @@ async function listDataPoints(accessToken, dataType, startFilter = null) {
     pageToken = result.nextPageToken ?? '';
   } while (pageToken && all.length < 50000);
   return all;
+}
+
+async function listDailyRollups(accessToken, dataType, startDate, endDate) {
+  const all = [];
+  let pageToken = '';
+  do {
+    const endpoint = new URL(`https://health.googleapis.com/v4/users/me/dataTypes/${dataType}/dataPoints:dailyRollUp`);
+    const dateValue = value => {
+      const [year, month, day] = value.split('-').map(Number);
+      return { date: { year, month, day } };
+    };
+    const body = {
+      range: { start: dateValue(startDate), end: dateValue(endDate) },
+      windowSizeDays: 1,
+      pageSize: 10000,
+      ...(pageToken ? { pageToken } : {}),
+    };
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${accessToken}`, accept: 'application/json', 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      const message = result.error?.message ?? `Google Health daily rollup failed (${response.status}).`;
+      throw new Error(message);
+    }
+    all.push(...(result.rollupDataPoints ?? []));
+    pageToken = result.nextPageToken ?? '';
+  } while (pageToken && all.length < 50000);
+  return all;
+}
+
+function shiftedDate(date, days) {
+  const shifted = new Date(`${date}T00:00:00.000Z`);
+  shifted.setUTCDate(shifted.getUTCDate() + days);
+  return shifted.toISOString().slice(0, 10);
+}
+
+function civilDate(value) {
+  const date = value?.date;
+  if (!date?.year || !date?.month || !date?.day) return null;
+  return `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`;
+}
+
+function durationSeconds(value) {
+  const match = String(value ?? '').match(/^([0-9]+(?:\.[0-9]+)?)s$/);
+  return match ? Math.round(Number(match[1])) : null;
 }
 
 function localDate(timestamp, offset) {
@@ -242,34 +290,35 @@ function add(map, date) {
 
 async function makeSnapshot(account) {
   const accessToken = await getAccessToken(account);
-  const from = new Date(Date.now() - 34 * 86400000).toISOString().slice(0, 10);
-  const stepFilter = `steps.interval.start_time >= "${from}T00:00:00Z"`;
-  const azmFilter = `active_zone_minutes.interval.start_time >= "${from}T00:00:00Z"`;
+  const today = new Date().toISOString().slice(0, 10);
+  const from = shiftedDate(today, -35);
+  const through = shiftedDate(today, 2);
   const sleepFilter = `sleep.interval.civil_end_time >= "${from}"`;
-  const [steps, azm, rhr, hrv, sleep] = await Promise.all([
-    listDataPoints(accessToken, 'steps', stepFilter),
-    listDataPoints(accessToken, 'active-zone-minutes', azmFilter),
+  const exerciseFilter = `exercise.interval.start_time >= "${from}T00:00:00Z"`;
+  const [stepDays, azmDays, rhr, hrv, sleep, exercise] = await Promise.all([
+    listDailyRollups(accessToken, 'steps', from, through),
+    listDailyRollups(accessToken, 'active-zone-minutes', from, through),
     listDataPoints(accessToken, 'daily-resting-heart-rate'),
     listDataPoints(accessToken, 'daily-heart-rate-variability'),
     listDataPoints(accessToken, 'sleep', sleepFilter),
+    listDataPoints(accessToken, 'exercise', exerciseFilter),
   ]);
 
   const days = new Map();
-  for (const point of steps) {
-    const data = point.steps;
-    if (!data?.interval?.startTime) continue;
-    const date = localDate(data.interval.startTime, data.interval.startUtcOffset);
-    if (date < from) continue;
+  for (const point of stepDays) {
+    const date = civilDate(point.civilStartTime);
+    if (!date || date < from || date >= through || point.steps?.countSum == null) continue;
     const day = add(days, date);
-    day.steps = (day.steps ?? 0) + Number(data.count ?? 0);
+    day.steps = Number(point.steps.countSum);
   }
-  for (const point of azm) {
-    const data = point.activeZoneMinutes;
-    if (!data?.interval?.startTime) continue;
-    const date = localDate(data.interval.startTime, data.interval.startUtcOffset);
-    if (date < from) continue;
+  for (const point of azmDays) {
+    const date = civilDate(point.civilStartTime);
+    if (!date || date < from || date >= through || !point.activeZoneMinutes) continue;
     const day = add(days, date);
-    day.activeZoneMinutes = (day.activeZoneMinutes ?? 0) + Number(data.activeZoneMinutes ?? 0);
+    const zones = point.activeZoneMinutes;
+    day.activeZoneMinutes = Number(zones.sumInFatBurnHeartZone ?? 0)
+      + Number(zones.sumInCardioHeartZone ?? 0)
+      + Number(zones.sumInPeakHeartZone ?? 0);
   }
   for (const point of rhr) {
     const data = point.dailyRestingHeartRate;
@@ -303,10 +352,30 @@ async function makeSnapshot(account) {
     };
     if (!day.sleep || (sleepEntry.minutesAsleep ?? 0) > (day.sleep.minutesAsleep ?? 0)) day.sleep = sleepEntry;
   }
+  const workouts = exercise.flatMap(point => {
+    const data = point.exercise;
+    const interval = data?.interval;
+    if (!interval?.startTime || !interval?.endTime) return [];
+    const summary = data.metricsSummary ?? {};
+    return [{
+      id: point.name ?? `${interval.startTime}-${data.exerciseType ?? 'workout'}`,
+      startTime: interval.startTime,
+      endTime: interval.endTime,
+      name: data.displayName ?? String(data.exerciseType ?? 'Workout').replaceAll('_', ' '),
+      type: data.exerciseType ?? 'UNKNOWN',
+      activeDurationSeconds: durationSeconds(data.activeDuration),
+      distanceMeters: Number(summary.distanceMillimeters) ? Number(summary.distanceMillimeters) / 1000 : null,
+      calories: Number(summary.caloriesKcal) || null,
+      steps: Number(summary.steps) || null,
+      averageHeartRate: Number(summary.averageHeartRateBeatsPerMinute) || null,
+      activeZoneMinutes: Number(summary.activeZoneMinutes) || null,
+    }];
+  }).sort((left, right) => right.startTime.localeCompare(left.startTime));
   return {
     user: { name: account.name, email: account.email },
     generatedAt: new Date().toISOString(),
     days: [...days.values()].sort((left, right) => right.date.localeCompare(left.date)),
+    workouts,
   };
 }
 

@@ -4,12 +4,13 @@ import Combine
 struct TrendsView: View {
     let snapshot: HealthSnapshot?
     @ObservedObject private var selection = TrendsSelection()
-    private let metrics = ["Steps", "HRV", "Resting HR", "Sleep"]
+    private let metrics = ["Steps", "Zone min", "HRV", "Resting HR", "Sleep"]
 
     private var days: [HealthDay] { (snapshot?.days ?? []).sorted { $0.date < $1.date } }
     private var values: [Double?] {
         days.map { day in
             switch selection.metric {
+            case "Zone min": day.activeZoneMinutes.map(Double.init)
             case "HRV": day.hrvMilliseconds
             case "Resting HR": day.restingHeartRate.map(Double.init)
             case "Sleep": day.sleep?.minutesAsleep.map(Double.init)
@@ -41,8 +42,12 @@ struct TrendsView: View {
                     NoDataMessage(title: "No trends available", detail: "Sync your Fitbit Air through Google Health to build your history.")
                 } else {
                     HStack(spacing: 12) {
-                        MetricCard(title: "Latest HRV", value: days.last?.hrvMilliseconds.map { "\(Int($0.rounded())) ms" } ?? "—", caption: "No invented baseline", icon: "waveform.path.ecg")
-                        MetricCard(title: "Activity load", value: days.last?.activityLoad.map(String.init) ?? "—", caption: "Based on AZM", icon: "flame.fill")
+                        NavigationLink { MetricDetailView(metric: .hrv, snapshot: snapshot) } label: {
+                            MetricCard(title: "Latest HRV", value: days.last?.hrvMilliseconds.map { "\(Int($0.rounded())) ms" } ?? "—", caption: "Open HRV detail", icon: "waveform.path.ecg")
+                        }.buttonStyle(.plain)
+                        NavigationLink { MetricDetailView(metric: .steps, snapshot: snapshot) } label: {
+                            MetricCard(title: "Latest steps", value: days.last?.steps.map { $0.formatted() } ?? "—", caption: "Open step detail", icon: "figure.walk")
+                        }.buttonStyle(.plain)
                     }
                 }
                 Text("Charts show synced measurements only. Gaps mean no data was returned for that day.")
@@ -56,6 +61,7 @@ struct TrendsView: View {
     private var summaryValue: String {
         guard let value = values.compactMap({ $0 }).last else { return "No data" }
         switch selection.metric {
+        case "Zone min": return "\(Int(value.rounded())) min"
         case "HRV": return "\(Int(value.rounded())) ms"
         case "Resting HR": return "\(Int(value.rounded())) bpm"
         case "Sleep": return "\(Int(value / 60))h \(Int(value) % 60)m"
@@ -101,8 +107,12 @@ struct SleepView: View {
                         }
                     }
                     HStack(spacing: 12) {
-                        MetricCard(title: "Resting HR", value: day.restingHeartRate.map { "\($0) bpm" } ?? "—", caption: "Synced measurement", icon: "heart.fill")
-                        MetricCard(title: "HRV", value: day.hrvMilliseconds.map { "\(Int($0.rounded())) ms" } ?? "—", caption: "Synced measurement", icon: "waveform.path.ecg")
+                        NavigationLink { MetricDetailView(metric: .restingHeartRate, snapshot: snapshot) } label: {
+                            MetricCard(title: "Resting HR", value: day.restingHeartRate.map { "\($0) bpm" } ?? "—", caption: "Open trend", icon: "heart.fill")
+                        }.buttonStyle(.plain)
+                        NavigationLink { MetricDetailView(metric: .hrv, snapshot: snapshot) } label: {
+                            MetricCard(title: "HRV", value: day.hrvMilliseconds.map { "\(Int($0.rounded())) ms" } ?? "—", caption: "Open trend", icon: "waveform.path.ecg")
+                        }.buttonStyle(.plain)
                     }
                 } else {
                     NoDataMessage(title: "No sleep data yet", detail: "Sync your Fitbit Air in Google Health. GOOP will show the recorded sleep session and stages here.")

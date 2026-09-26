@@ -3,13 +3,6 @@ import Foundation
 enum HealthScoreCalculator {
     static let sleepGoalMinutes = 8 * 60
 
-    /// A transparent GOOP activity load indicator, not a clinical or WHOOP score.
-    /// Fitbit awards AZM as 1 point in fat-burn and 2 in cardio/peak zones.
-    static func activityLoad(activeZoneMinutes: Int?) -> Int? {
-        guard let activeZoneMinutes else { return nil }
-        return min(21, max(0, Int((Double(activeZoneMinutes) / 90 * 21).rounded())))
-    }
-
     /// An estimate is shown only after at least seven previous measurements are available.
     /// It combines sleep against an 8-hour target, HRV against a 28-day median, and
     /// resting heart rate against a 28-day median. This is a GOOP wellness estimate.
@@ -49,4 +42,5 @@ enum HealthScoreCalculator {
     private static func median(_ values: [Int]) -> Double {
         median(values.map(Double.init))
     }
+
 }

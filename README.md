@@ -6,8 +6,9 @@ This setup is for one person. The backend rejects sign-ins from any Google accou
 
 ## What GOOP calculates
 
-- Activity load is `active-zone-minutes / 90 * 21`, capped at 21.
+- Steps and active-zone minutes use Google's reconciled daily rollups, preventing overlapping tracker and phone sources from being naively added together.
 - Readiness is a GOOP estimate using sleep duration and current HRV/resting heart rate compared with your 28-day medians. It is not shown until at least seven previous days of both HRV and resting-heart-rate history exist.
+- GOOP offers daily health metrics, trends, sleep summaries, readiness estimates, and a workout log from fields Google Health supplies. It does not reproduce WHOOP's proprietary Strain or Recovery algorithms, continuous sensor features, coaching, or membership services.
 - These are GOOP wellness estimates, not medical measures or WHOOP's proprietary scores.
 - Missing Google Health data stays missing. GOOP does not generate sample readings.
 
@@ -95,6 +96,7 @@ The app registers the `goop://auth/callback` URL scheme in `GOOP/GOOP-Info.plist
 - `GOOP_ALLOWED_EMAIL` restricts Google OAuth to one verified email address. This is a safeguard for personal deployment, not a substitute for keeping the domain and secrets private.
 - This prototype has no automated database backups. Review Railway's volume backup options and keep a secure backup before relying on the data store.
 - Google Health data types depend on the source device and what has synced to Google Health. GOOP only displays returned data.
+- The Train tab only lists exercise sessions and summary fields Google Health returned for your connected sources. A feature is not available when the source does not provide its data.
 
 ## Local server development
 
