@@ -7,7 +7,7 @@ struct SignInView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer()
-            Text("GOOP").font(.system(size: 42, weight: .black, design: .rounded)).tracking(-2)
+            GoopWordmark(markSize: 54)
             Text("Know how you're recovering.")
                 .font(.system(size: 22, weight: .semibold, design: .rounded)).padding(.top, 18)
             Text("Connect your Google Health account to see Fitbit activity, sleep, and health metrics in one place.")
@@ -23,15 +23,15 @@ struct SignInView: View {
                 }
                 .foregroundStyle(GoopStyle.ink)
                 .padding(17)
-                .background(GoopStyle.lime, in: RoundedRectangle(cornerRadius: 16))
+                .background(GoopStyle.heroGradient, in: RoundedRectangle(cornerRadius: 16))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(GoopCardPressStyle())
             .disabled(state == .connecting)
             .padding(.top, 26)
 
             if case .failed(let message) = state {
                 Label(message, systemImage: "exclamationmark.circle")
-                    .font(.system(size: 12, design: .rounded)).foregroundStyle(.red)
+                    .font(.system(size: 12, design: .rounded)).foregroundStyle(GoopStyle.terracotta)
                     .lineSpacing(3).padding(.top, 14)
             }
 
@@ -42,17 +42,18 @@ struct SignInView: View {
                 .font(.system(size: 10, design: .rounded)).foregroundStyle(GoopStyle.muted).padding(.bottom, 26)
         }
         .padding(.horizontal, 26)
-        .background(GoopStyle.canvas.ignoresSafeArea())
+        .background(GoopStyle.backgroundGradient.ignoresSafeArea())
     }
 }
 
 struct LoadingView: View {
     var body: some View {
         VStack(spacing: 14) {
-            ProgressView().tint(GoopStyle.ink)
+            GoopBrandMark(size: 52)
+            ProgressView().tint(GoopStyle.ember)
             Text("Loading your health data").font(.system(size: 14, design: .rounded)).foregroundStyle(GoopStyle.muted)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(GoopStyle.canvas.ignoresSafeArea())
+        .background(GoopStyle.backgroundGradient.ignoresSafeArea())
     }
 }

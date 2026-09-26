@@ -3,10 +3,13 @@ import Combine
 
 struct TrendsView: View {
     let snapshot: HealthSnapshot?
-    @ObservedObject private var selection = TrendsSelection()
+    let refresh: () async -> Void
+    @StateObject private var selection = TrendsSelection()
     private let metrics = ["Steps", "Zone min", "HRV", "Resting HR", "Sleep"]
 
-    private var days: [HealthDay] { (snapshot?.days ?? []).sorted { $0.date < $1.date } }
+    private var days: [HealthDay] { (snapshot?.days ?? []).filter { $0.date <= GoopStyle.localDateKey }.sorted { $0.date < $1.date } }
+    private var latestHRV: HealthDay? { days.last { $0.hrvMilliseconds != nil } }
+    private var latestSteps: HealthDay? { days.last { $0.steps != nil } }
     private var values: [Double?] {
         days.map { day in
             switch selection.metric {
@@ -23,10 +26,16 @@ struct TrendsView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 20) {
                 PageTitle(kicker: "Your patterns", title: "Trends")
+                Text("CHOOSE A METRIC")
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .tracking(1.1)
+                    .foregroundStyle(GoopStyle.muted)
+                    .padding(.bottom, -14)
                 Picker("Metric", selection: $selection.metric) {
                     ForEach(metrics, id: \.self) { Text($0).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                .tint(GoopStyle.ember)
 
                 SurfaceCard {
                     VStack(alignment: .leading, spacing: 15) {
@@ -43,11 +52,11 @@ struct TrendsView: View {
                 } else {
                     HStack(spacing: 12) {
                         NavigationLink { MetricDetailView(metric: .hrv, snapshot: snapshot) } label: {
-                            MetricCard(title: "Latest HRV", value: days.last?.hrvMilliseconds.map { "\(Int($0.rounded())) ms" } ?? "—", caption: "Open HRV detail", icon: "waveform.path.ecg")
-                        }.buttonStyle(.plain)
+                            MetricCard(title: "Latest HRV", value: latestHRV?.hrvMilliseconds.map { "\(Int($0.rounded())) ms" } ?? "—", caption: "Open HRV detail", icon: "waveform.path.ecg", interactionHint: "View history")
+                        }.buttonStyle(GoopCardPressStyle())
                         NavigationLink { MetricDetailView(metric: .steps, snapshot: snapshot) } label: {
-                            MetricCard(title: "Latest steps", value: days.last?.steps.map { $0.formatted() } ?? "—", caption: "Open step detail", icon: "figure.walk")
-                        }.buttonStyle(.plain)
+                            MetricCard(title: "Latest steps", value: latestSteps?.steps.map { $0.formatted() } ?? "—", caption: "Open step detail", icon: "figure.walk", interactionHint: "View history")
+                        }.buttonStyle(GoopCardPressStyle())
                     }
                 }
                 Text("Charts show synced measurements only. Gaps mean no data was returned for that day.")
@@ -55,7 +64,9 @@ struct TrendsView: View {
             }
             .padding(.horizontal, 20).padding(.top, 14)
         }
-        .background(GoopStyle.canvas)
+        .background(GoopStyle.backgroundGradient)
+        .toolbar { GoopRefreshToolbarButton { await refresh() } }
+        .refreshable { await refresh() }
     }
 
     private var summaryValue: String {
@@ -76,7 +87,8 @@ private final class TrendsSelection: ObservableObject {
 
 struct SleepView: View {
     let snapshot: HealthSnapshot?
-    private var day: HealthDay? { snapshot?.days.first(where: { $0.sleep != nil }) }
+    let refresh: () async -> Void
+    private var day: HealthDay? { snapshot?.days.first(where: { $0.date <= GoopStyle.localDateKey && $0.sleep != nil }) }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -102,17 +114,17 @@ struct SleepView: View {
                             Text("SLEEP STAGES").font(.system(size: 10, weight: .bold, design: .rounded)).tracking(1.1).foregroundStyle(GoopStyle.muted)
                             StageRow(name: "Deep", time: formatMinutes(sleep.deepMinutes), share: fraction(sleep.deepMinutes, sleep.minutesAsleep), color: GoopStyle.ink)
                             StageRow(name: "REM", time: formatMinutes(sleep.remMinutes), share: fraction(sleep.remMinutes, sleep.minutesAsleep), color: GoopStyle.muted)
-                            StageRow(name: "Light", time: formatMinutes(sleep.lightMinutes), share: fraction(sleep.lightMinutes, sleep.minutesAsleep), color: GoopStyle.lime)
+                            StageRow(name: "Light", time: formatMinutes(sleep.lightMinutes), share: fraction(sleep.lightMinutes, sleep.minutesAsleep), color: GoopStyle.ember)
                             StageRow(name: "Awake", time: formatMinutes(sleep.awakeMinutes), share: fraction(sleep.awakeMinutes, sleep.minutesInBed), color: GoopStyle.ink.opacity(0.25))
                         }
                     }
                     HStack(spacing: 12) {
                         NavigationLink { MetricDetailView(metric: .restingHeartRate, snapshot: snapshot) } label: {
-                            MetricCard(title: "Resting HR", value: day.restingHeartRate.map { "\($0) bpm" } ?? "—", caption: "Open trend", icon: "heart.fill")
-                        }.buttonStyle(.plain)
+                            MetricCard(title: "Resting HR", value: day.restingHeartRate.map { "\($0) bpm" } ?? "—", caption: "Open trend", icon: "heart.fill", interactionHint: "View history")
+                        }.buttonStyle(GoopCardPressStyle())
                         NavigationLink { MetricDetailView(metric: .hrv, snapshot: snapshot) } label: {
-                            MetricCard(title: "HRV", value: day.hrvMilliseconds.map { "\(Int($0.rounded())) ms" } ?? "—", caption: "Open trend", icon: "waveform.path.ecg")
-                        }.buttonStyle(.plain)
+                            MetricCard(title: "HRV", value: day.hrvMilliseconds.map { "\(Int($0.rounded())) ms" } ?? "—", caption: "Open trend", icon: "waveform.path.ecg", interactionHint: "View history")
+                        }.buttonStyle(GoopCardPressStyle())
                     }
                 } else {
                     NoDataMessage(title: "No sleep data yet", detail: "Sync your Fitbit Air in Google Health. GOOP will show the recorded sleep session and stages here.")
@@ -122,7 +134,9 @@ struct SleepView: View {
             }
             .padding(.horizontal, 20).padding(.top, 14)
         }
-        .background(GoopStyle.canvas)
+        .background(GoopStyle.backgroundGradient)
+        .toolbar { GoopRefreshToolbarButton { await refresh() } }
+        .refreshable { await refresh() }
     }
 
     private func fraction(_ value: Int?, _ total: Int?) -> CGFloat {
@@ -148,8 +162,8 @@ private struct StageRow: View {
             Text(name).font(.system(size: 12, weight: .medium, design: .rounded)).frame(width: 42, alignment: .leading)
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(GoopStyle.ink.opacity(0.05))
-                    Capsule().fill(color).frame(width: geometry.size.width * share)
+                    Capsule().fill(GoopStyle.ink.opacity(0.10))
+                    Capsule().fill(LinearGradient(colors: [GoopStyle.ember, GoopStyle.clay], startPoint: .leading, endPoint: .trailing)).frame(width: geometry.size.width * share)
                 }
             }.frame(height: 6)
             Text(time).font(.system(size: 10, weight: .semibold, design: .rounded)).frame(width: 52, alignment: .trailing)

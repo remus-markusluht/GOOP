@@ -18,18 +18,21 @@ struct ContentView: View {
                 TabView {
                     NavigationStack { DashboardView(session: session) }
                         .tabItem { Label("Today", systemImage: "circle.grid.2x2.fill") }
-                    NavigationStack { WorkoutsView(snapshot: session.snapshot) }
+                    NavigationStack { WorkoutsView(snapshot: session.snapshot, refresh: { await session.refresh() }) }
                         .tabItem { Label("Train", systemImage: "figure.run") }
-                    NavigationStack { TrendsView(snapshot: session.snapshot) }
+                    NavigationStack { TrendsView(snapshot: session.snapshot, refresh: { await session.refresh() }) }
                         .tabItem { Label("Trends", systemImage: "chart.xyaxis.line") }
-                    NavigationStack { SleepView(snapshot: session.snapshot) }
+                    NavigationStack { SleepView(snapshot: session.snapshot, refresh: { await session.refresh() }) }
                         .tabItem { Label("Sleep", systemImage: "moon.zzz") }
-                    NavigationStack { ProfileView(snapshot: session.snapshot, signOut: session.signOut) }
+                    NavigationStack { ProfileView(snapshot: session.snapshot, refresh: { await session.refresh() }, signOut: session.signOut) }
                         .tabItem { Label("You", systemImage: "person.crop.circle") }
                 }
-                .tint(GoopStyle.ink)
+                .tint(GoopStyle.terracotta)
+                .toolbarBackground(GoopStyle.panel, for: .tabBar)
+                .toolbarBackground(.visible, for: .tabBar)
             }
         }
-        .background(GoopStyle.canvas.ignoresSafeArea())
+        .background(GoopStyle.backgroundGradient.ignoresSafeArea())
+        .preferredColorScheme(.dark)
     }
 }

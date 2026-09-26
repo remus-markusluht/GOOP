@@ -3,6 +3,7 @@ import Combine
 
 struct ProfileView: View {
     let snapshot: HealthSnapshot?
+    let refresh: () async -> Void
     let signOut: () -> Void
     @ObservedObject private var confirmation = SignOutConfirmation()
 
@@ -51,7 +52,9 @@ struct ProfileView: View {
             }
             .padding(.horizontal, 20).padding(.top, 14)
         }
-        .background(GoopStyle.canvas)
+        .background(GoopStyle.backgroundGradient)
+        .toolbar { GoopRefreshToolbarButton { await refresh() } }
+        .refreshable { await refresh() }
     }
 }
 

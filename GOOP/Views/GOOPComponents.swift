@@ -13,6 +13,22 @@ struct PageTitle: View {
     }
 }
 
+struct GoopRefreshToolbarButton: ToolbarContent {
+    let action: () async -> Void
+
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Button {
+                Task { await action() }
+            } label: {
+                Image(systemName: "arrow.clockwise")
+            }
+            .tint(GoopStyle.terracotta)
+            .accessibilityLabel("Refresh health data")
+        }
+    }
+}
+
 struct SurfaceCard<Content: View>: View {
     @ViewBuilder let content: Content
 
@@ -20,7 +36,9 @@ struct SurfaceCard<Content: View>: View {
         content
             .foregroundStyle(GoopStyle.ink)
             .padding(18)
-            .background(GoopStyle.panel, in: RoundedRectangle(cornerRadius: 20))
+            .background(GoopStyle.panelGradient, in: RoundedRectangle(cornerRadius: 20))
+            .overlay(RoundedRectangle(cornerRadius: 20).stroke(GoopStyle.line, lineWidth: 1))
+            .shadow(color: GoopStyle.ember.opacity(0.10), radius: 18, x: 0, y: 8)
     }
 }
 
@@ -29,20 +47,34 @@ struct MetricCard: View {
     let value: String
     let caption: String
     let icon: String
+    var interactionHint: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Image(systemName: icon).foregroundStyle(GoopStyle.ink)
+                Image(systemName: icon)
+                    .foregroundStyle(GoopStyle.terracotta)
+                    .frame(width: 28, height: 28)
+                    .background(GoopStyle.ember.opacity(0.14), in: RoundedRectangle(cornerRadius: 9))
                 Spacer()
+                if interactionHint != nil {
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(GoopStyle.terracotta)
+                        .padding(.trailing, 4)
+                }
                 Text(title.uppercased()).font(.system(size: 9, weight: .bold, design: .rounded)).tracking(1).foregroundStyle(GoopStyle.muted)
             }
             Text(value).font(.system(size: 26, weight: .medium, design: .rounded)).tracking(-0.7).foregroundStyle(GoopStyle.ink)
-            Text(caption.uppercased()).font(.system(size: 8, weight: .bold, design: .rounded)).tracking(0.8).foregroundStyle(GoopStyle.muted)
+            Text((interactionHint ?? caption).uppercased())
+                .font(.system(size: 8, weight: .bold, design: .rounded))
+                .tracking(0.8)
+                .foregroundStyle(interactionHint == nil ? GoopStyle.muted : GoopStyle.terracotta)
         }
         .padding(15)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(GoopStyle.panel, in: RoundedRectangle(cornerRadius: 20))
+        .background(GoopStyle.panelGradient, in: RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(GoopStyle.line, lineWidth: 1))
     }
 }
 
@@ -105,9 +137,9 @@ struct HistoryLine: View {
                     guard let first = points.first else { return }
                     path.move(to: first)
                     for point in points.dropFirst() { path.addLine(to: point) }
-                }.stroke(GoopStyle.lime, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                }.stroke(GoopStyle.ember, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
                 if let last = points.last {
-                    Circle().fill(GoopStyle.lime).frame(width: 8, height: 8).position(last)
+                    Circle().fill(GoopStyle.ember).frame(width: 8, height: 8).position(last)
                 }
             }
         }

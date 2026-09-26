@@ -1,103 +1,150 @@
-# GOOP for personal use
+# GOOP
 
-GOOP is a native SwiftUI iPhone app that reads Google Health data synced from Fitbit devices. The app talks to a small Node.js server deployed on Railway. Google OAuth secrets stay on that server; your Google refresh token is encrypted before it is stored on a Railway Volume.
+GOOP is a small iPhone app for checking Fitbit health data that has synced to Google Health. It puts daily movement, sleep, workouts, trends, and a simple readiness estimate in one place.
 
-This setup is for one person. The backend rejects sign-ins from any Google account other than `GOOP_ALLOWED_EMAIL`.
+I built it for personal use. It is not WHOOP, it does not use WHOOP's private Strain or Recovery algorithms, and its readiness number is a general wellness estimate rather than medical advice. If Google Health has not received a reading from your device, GOOP leaves that field empty.
 
-## What GOOP calculates
+## A look around
 
-- Steps and active-zone minutes use Google's reconciled daily rollups, preventing overlapping tracker and phone sources from being naively added together.
-- Readiness is a GOOP estimate using sleep duration and current HRV/resting heart rate compared with your 28-day medians. It is not shown until at least seven previous days of both HRV and resting-heart-rate history exist.
-- GOOP offers daily health metrics, trends, sleep summaries, readiness estimates, and a workout log from fields Google Health supplies. It does not reproduce WHOOP's proprietary Strain or Recovery algorithms, continuous sensor features, coaching, or membership services.
-- These are GOOP wellness estimates, not medical measures or WHOOP's proprietary scores.
-- Missing Google Health data stays missing. GOOP does not generate sample readings.
+| Today | Train | Trends |
+| --- | --- | --- |
+| <img src="docs/screenshots/today.png" alt="GOOP Today screen" width="220"> | <img src="docs/screenshots/train.png" alt="GOOP workout details" width="220"> | <img src="docs/screenshots/trends.png" alt="GOOP trends screen" width="220"> |
 
-## Part 1: Create a Google Cloud project
+| Sleep | Profile |
+| --- | --- |
+| <img src="docs/screenshots/sleep.png" alt="GOOP sleep screen" width="220"> | <img src="docs/screenshots/profile.png" alt="GOOP profile screen" width="220"> |
 
-1. Open [Google Cloud Console](https://console.cloud.google.com/) and create a project for GOOP.
-2. Enable **Google Health API** for that project.
-3. Configure the OAuth consent screen. Choose **External** unless your Google account belongs to a managed Google Workspace organization that can use Internal.
-4. Add the email you will use on your iPhone under **Audience → Test users**. Use the same address later for `GOOP_ALLOWED_EMAIL`.
-5. Under **Data Access**, add only the scopes GOOP requests:
-   - `openid`, `email`, `profile`
-   - `googlehealth.activity_and_fitness.readonly`
-   - `googlehealth.sleep.readonly`
-   - `googlehealth.health_metrics_and_measurements.readonly`
-6. Create an OAuth client with application type **Web application**. You will add its callback URL after you create the Railway service and generate its domain.
+## What you need
 
-Google's [setup guide](https://developers.google.com/health/setup) explains project enablement, test users, and scope configuration. The first OAuth grant may show Google's unverified-app warning; proceed only with the Google account you added as a test user.
+- A Mac with Xcode. This project currently targets iOS 27.0, so use an Xcode version and iPhone that support that target.
+- A Google Cloud project with the Google Health API enabled.
+- A Railway account for the small server that handles Google sign-in and requests health data.
+- A private GitHub repository if you want Railway to deploy from GitHub.
 
-## Part 2: Deploy the GOOP server to Railway
+For your own iPhone, you can install a build directly from Xcode with a free Apple Account. TestFlight distribution requires Apple Developer Program membership. [Apple's membership comparison](https://developer.apple.com/support/compare-memberships/) lays out the difference.
 
-The Git repository root is the `GOOP` folder containing `GOOP.xcodeproj`, `server/`, and this README.
+## How the pieces fit together
 
-1. Create a **private** GitHub repository, then from this local repository (`/Users/remus/Documents/GOOP/GOOP`) commit and push the project. The local repository currently has no Git remote configured:
+The iPhone app sends you through Google's sign-in page, then asks the GOOP server for your synced health information. The server keeps the Google client secret and the refresh token; the iOS app never contains the client secret. The server is configured to accept only the email address in `GOOP_ALLOWED_EMAIL`.
+
+Google Health can only return data that your Fitbit device has synced and that you approved on Google's consent screen. The app currently displays activity, sleep, health metrics, workouts, history, and a GOOP readiness estimate. The estimate needs at least seven earlier days of HRV and resting heart-rate readings, plus today's sleep and readings, before it appears.
+
+## Set up Google sign-in
+
+1. Open [Google Cloud Console](https://console.cloud.google.com/) and create a project for GOOP, or choose an existing one.
+2. Enable **Google Health API** for the project. Google's [setup guide](https://developers.google.com/health/setup) has screenshots and the latest console steps.
+3. In **Google Auth Platform → Audience**, set the audience to **External** and add your Google account as a test user. Use this same email for `GOOP_ALLOWED_EMAIL` later.
+4. In **Google Auth Platform → Data Access**, allow the scopes the app uses:
+   - `openid`, `email`, and `profile`
+   - `https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly`
+   - `https://www.googleapis.com/auth/googlehealth.sleep.readonly`
+   - `https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly`
+5. Create an OAuth client ID with application type **Web application**. You will add the redirect URI after Railway gives you a public domain.
+
+The Google consent screen may warn that GOOP is unverified while it is in Testing. That is expected for a personal project. Google currently expires authorizations and refresh tokens for apps in Testing after seven days when they request these health-data scopes, so you may have to sign in again weekly. Moving the app to Production is not a shortcut around Google's review requirements; see Google's [testing-mode details](https://support.google.com/cloud/answer/15549945?hl=en) and [Google Health OAuth setup](https://developers.google.com/health/setup).
+
+## Deploy the server to Railway
+
+The Xcode project and backend live in this repository. Railway should build from the `server` folder.
+
+1. Use a **private** GitHub repository for the project. From the `GOOP` repository folder, save and push the current changes:
 
    ```sh
    git add -A
-   git commit -m "Prepare GOOP for personal Railway deployment"
-   git remote add origin https://github.com/YOUR_GITHUB_NAME/YOUR_PRIVATE_REPO.git
+   git commit -m "Update GOOP setup guide"
+   git remote -v
    git push -u origin main
    ```
 
-   Replace the remote URL with your private repository URL. Do not commit `server/.env` or any secrets; the repository ignore rules exclude them.
-2. In [Railway](https://railway.com/), create a project and choose **Deploy from GitHub repo**. Select the repository.
-3. Open the new service's **Settings → Build → Root Directory** and set it to `/server`. Railway will then detect `server/package.json` and run `npm start`.
-4. In the service's **Settings → Networking**, choose **Generate Domain**. Copy the HTTPS domain, for example `https://goop-production-xxxx.up.railway.app`.
-5. Return to Google Cloud and add this exact **Authorized redirect URI** to the Web application OAuth client:
-   `https://YOUR-RAILWAY-DOMAIN/auth/google/callback`
-   Replace `YOUR-RAILWAY-DOMAIN` with the hostname Railway generated. Do not add a trailing slash.
-6. In Railway, open the service's **Variables** and add the following variables. For the two random secrets, generate values in Terminal with the commands below and paste each result into Railway. Keep both values private and unchanged across deploys.
+   If `git remote -v` shows the wrong GitHub repository, update it with `git remote set-url origin https://github.com/YOUR-NAME/YOUR-PRIVATE-REPO.git` before pushing. If there is no `origin` yet, add one with `git remote add origin https://github.com/YOUR-NAME/YOUR-PRIVATE-REPO.git`. `server/.env` is ignored by Git; keep it that way and never upload your client secret or generated keys.
+
+2. In [Railway](https://railway.com/), create a project and deploy from your GitHub repository.
+3. In the new service's **Settings**, set the **Root Directory** to `/server`. The service uses Node.js 20 or newer and starts with `npm start`.
+4. In **Networking**, generate a Railway domain. Copy the HTTPS address Railway gives you, for example `https://your-goop-service.up.railway.app`.
+5. Go back to Google Cloud, open the Web application OAuth client, and add this exact **Authorized redirect URI**:
+
+   ```text
+   https://your-goop-service.up.railway.app/auth/google/callback
+   ```
+
+   Replace the example host with your Railway domain. The URI must match `GOOGLE_REDIRECT_URI` exactly, including the path.
+
+6. In Railway's service **Variables**, add the following. For the two random values, open Terminal on your Mac and run each command once:
 
    ```sh
    openssl rand -base64 32
    openssl rand -hex 32
    ```
 
-   Set these Railway Variables:
+   Put the first output in `GOOP_TOKEN_ENCRYPTION_KEY` and the second in `GOOP_SESSION_PEPPER`.
 
    | Variable | Value |
-   |---|---|
-   | `GOOGLE_CLIENT_ID` | Client ID from the Google Web application OAuth client |
+   | --- | --- |
+   | `GOOGLE_CLIENT_ID` | Client ID from your Google Web application OAuth client |
    | `GOOGLE_CLIENT_SECRET` | Client secret from that same OAuth client |
-   | `GOOGLE_REDIRECT_URI` | `https://YOUR-RAILWAY-DOMAIN/auth/google/callback` |
+   | `GOOGLE_REDIRECT_URI` | `https://your-goop-service.up.railway.app/auth/google/callback` |
    | `GOOP_ALLOWED_EMAIL` | The exact Google email you added as a test user |
    | `GOOP_TOKEN_ENCRYPTION_KEY` | Output of `openssl rand -base64 32` |
    | `GOOP_SESSION_PEPPER` | Output of `openssl rand -hex 32` |
    | `GOOP_DATA_FILE` | `/data/store.json` |
    | `IOS_CALLBACK_URI` | `goop://auth/callback` |
 
-   Railway sets `PORT` automatically; do not set it manually.
+   Railway sets `PORT` for the app. Leave it alone.
 
-7. In Railway, open the service's **Volumes** settings, add a Volume, and set its mount path to `/data`. The GOOP server writes the encrypted token store to `/data/store.json`. Railway's container filesystem is otherwise ephemeral, so the volume is necessary to keep your connection across deploys/restarts. See [Railway Volumes](https://docs.railway.com/volumes).
-8. In Railway **Settings → Deploy**, set the health-check path to `/healthz`. Keep the service at one replica because the brief OAuth state and one-time code are held in memory. Deploy/redeploy the service. Open `https://YOUR-RAILWAY-DOMAIN/healthz`; it should respond with `{"ok":true}`.
+7. Add a Railway **Volume** to the service and set its mount path to `/data`. The server stores the encrypted Google token there. Without the volume, a redeploy or restart can erase the saved connection. Railway explains this in its [Volumes guide](https://docs.railway.com/volumes).
+8. In Railway's deployment settings, set the health-check path to `/healthz`. Keep the service at **one replica**: the short-lived OAuth sign-in state is kept in server memory during login.
+9. Deploy the service. Open `https://your-goop-service.up.railway.app/healthz` in a browser. A working service responds with `{"ok":true}`.
 
-Railway provides HTTPS for its generated domain. Use that same base URL in Google Cloud's callback and in the iOS app. Railway's [domain guide](https://docs.railway.com/networking/domains/working-with-domains) covers generated domains and SSL.
+Keep the two generated keys somewhere safe. Do not rotate `GOOP_TOKEN_ENCRYPTION_KEY` after signing in: the server needs the same key to decrypt the saved Google refresh token. Railway's [domain guide](https://docs.railway.com/networking/domains/working-with-domains) explains generated domains and HTTPS.
 
-### Google test-mode expiry
-
-Google OAuth projects left in **Testing** expire authorizations and refresh tokens after seven days when they request health-data scopes. That means you may need to sign in again about once a week. For personal use, Google documents a personal-use exception to verification, but publishing status, warning screens, and scope rules still apply. See Google's [Testing-mode behavior](https://support.google.com/cloud/answer/15549945) and [verification exceptions](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification). Do not assume that changing the app to In production will bypass every Google Health requirement; follow what the Google Cloud console allows for your project.
-
-## Part 3: Point the iOS app to Railway
+## Install GOOP on your iPhone
 
 1. Open `GOOP.xcodeproj` in Xcode.
-2. Select the GOOP app target, then **Build Settings**. Search for `GOOP_API_BASE_URL`.
-3. Set both **Debug** and **Release** to the Railway base URL, such as `https://goop-production-xxxx.up.railway.app` (no trailing slash). Debug's default is localhost for local development; it will not reach Railway until you change it.
-4. Choose your iPhone simulator or a connected iPhone and run GOOP.
-5. Tap **Continue with Google**, sign in with the allowed/test-user Google account, and approve the requested scopes. After Google returns to GOOP, the app fetches the available data.
+2. In Xcode, open the **GOOP** project and select the **GOOP** app target.
+3. Under **Signing & Capabilities**, choose your Apple Account's **Personal Team**. If Xcode asks, sign in from **Xcode → Settings → Accounts**. Xcode may ask you to change the bundle identifier to a unique value for your team; accept the suggested change.
+4. Select the **GOOP** target's **Build Settings** tab and search for `GOOP_API_BASE_URL`. Set both **Debug** and **Release** to your Railway HTTPS address, without a trailing slash. The current project setting points to the existing GOOP Railway service; replace it if you made a new one.
+5. Connect your iPhone to your Mac, select it as the run destination in Xcode, and press the **Run** button. On first use, accept the trust and Developer Mode prompts on the iPhone if they appear. You can pair the phone wirelessly from Xcode after it has been connected once.
+6. When GOOP opens, tap **Continue with Google**, choose the email you added as the test user, and approve the requested health permissions.
+7. Sync your Fitbit with Google Health, then pull down in GOOP to refresh.
 
-The app registers the `goop://auth/callback` URL scheme in `GOOP/GOOP-Info.plist`. Do not add the Google client secret to Xcode build settings or the iOS target.
+The Google client secret belongs only in Railway's Variables. Do not put it in Xcode or in the iOS app.
 
-## Personal-use security and limits
+## Running the server locally
 
-- Keep the Railway service to one replica: OAuth state and one-time exchange codes are held in server memory during the short sign-in round trip.
-- Keep the Railway Volume attached, and do not change or lose `GOOP_TOKEN_ENCRYPTION_KEY`; without it, the stored Google refresh token cannot be decrypted.
-- The Railway `/healthz` endpoint is public and reveals no account data. All health-data endpoints require the app's bearer session token.
-- `GOOP_ALLOWED_EMAIL` restricts Google OAuth to one verified email address. This is a safeguard for personal deployment, not a substitute for keeping the domain and secrets private.
-- This prototype has no automated database backups. Review Railway's volume backup options and keep a secure backup before relying on the data store.
-- Google Health data types depend on the source device and what has synced to Google Health. GOOP only displays returned data.
-- The Train tab only lists exercise sessions and summary fields Google Health returned for your connected sources. A feature is not available when the source does not provide its data.
+You can develop the iOS screens without running the server if you point the app at your Railway service. To run the backend locally, Node.js 20 or newer is needed.
 
-## Local server development
+1. In Terminal, go to `server/` and copy the example environment file:
 
-From `server/`, copy `.env.example` to `.env` and export its variables into your shell (Node does not automatically load `.env`). Use `GOOP_DATA_FILE=./data/store.json` locally. Run `npm start`. For local simulator use, set the app's Debug `GOOP_API_BASE_URL` to `http://127.0.0.1:8787`; for an iPhone, use a publicly reachable HTTPS server such as Railway.
+   ```sh
+   cd server
+   cp .env.example .env
+   ```
+
+2. Edit `.env` with your Google credentials and the other values listed above. For Google sign-in, `GOOGLE_REDIRECT_URI` needs to be a reachable HTTPS callback; a plain `localhost` address will not work for the deployed OAuth client.
+3. Load the file into your shell and start the server:
+
+   ```sh
+   set -a
+   source .env
+   set +a
+   npm start
+   ```
+
+   The server listens on port `8787` locally unless `PORT` is set. Its local health check is `http://127.0.0.1:8787/healthz`.
+
+4. For the iOS Simulator, set `GOOP_API_BASE_URL` to `http://127.0.0.1:8787`. For a physical iPhone, use a reachable HTTPS server address; the phone cannot use your Mac's `127.0.0.1` address.
+
+## If something goes wrong
+
+- **The app says “GOOP server request failed.”** Open the Railway `/healthz` URL first. If it does not return `{"ok":true}`, check the Railway deploy logs and variables. If it does, confirm the Xcode `GOOP_API_BASE_URL` is that same host.
+- **Google says `redirect_uri_mismatch`.** Compare the callback URI in Google Cloud with `GOOGLE_REDIRECT_URI` in Railway. They must be identical.
+- **The server says an environment variable is missing.** Check Railway's service Variables, then redeploy.
+- **Google says the account is not allowed.** Make sure you are using the exact email in both the OAuth test-user list and `GOOP_ALLOWED_EMAIL`.
+- **You signed in, but data is missing.** Sync the Fitbit in Google Health, check that you granted the matching data permission, and refresh GOOP. Not every device supplies every metric or workout field.
+- **The saved sign-in stops working after a week.** That is Google's current seven-day limit for health-data authorizations while the OAuth app is in Testing. Sign in again; do not delete the Railway volume or change the encryption key.
+
+## A couple of things to keep in mind
+
+This server is set up for one person. Keep the Railway repository private, leave the service at one replica, and don't share the generated keys. The Google account restriction is useful for a personal deployment, but it is not a replacement for keeping your credentials private.
+
+GOOP is for general wellness only. Its readiness score is an estimate based on the data Google returns; it is not medical advice and should not be used to make medical decisions.

@@ -4,9 +4,9 @@ struct MetricDetailView: View {
     let metric: DetailMetric
     let snapshot: HealthSnapshot?
 
-    private var days: [HealthDay] { (snapshot?.days ?? []).sorted { $0.date < $1.date } }
+    private var days: [HealthDay] { (snapshot?.days ?? []).filter { $0.date <= GoopStyle.localDateKey }.sorted { $0.date < $1.date } }
     private var chartValues: [Double?] { days.map { metric.value(in: $0) } }
-    private var latest: HealthDay? { snapshot?.days.first(where: { metric.value(in: $0) != nil }) }
+    private var latest: HealthDay? { days.last(where: { metric.value(in: $0) != nil }) }
 
     var body: some View {
         ScrollView {
@@ -43,7 +43,7 @@ struct MetricDetailView: View {
             }
             .padding(.horizontal, 20).padding(.top, 16)
         }
-        .background(GoopStyle.canvas)
+        .background(GoopStyle.backgroundGradient)
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -132,7 +132,7 @@ struct ReadinessDetailView: View {
             }
             .padding(.horizontal, 20).padding(.top, 16)
         }
-        .background(GoopStyle.canvas)
+        .background(GoopStyle.backgroundGradient)
         .navigationBarTitleDisplayMode(.inline)
     }
 

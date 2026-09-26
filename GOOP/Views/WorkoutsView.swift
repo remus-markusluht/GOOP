@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WorkoutsView: View {
     let snapshot: HealthSnapshot?
+    let refresh: () async -> Void
     private var workouts: [WorkoutSummary] { snapshot?.workouts ?? [] }
 
     var body: some View {
@@ -17,8 +18,9 @@ struct WorkoutsView: View {
                                 HStack(alignment: .top, spacing: 13) {
                                     Image(systemName: icon(for: workout.type))
                                         .font(.system(size: 18, weight: .semibold))
+                                        .foregroundStyle(GoopStyle.ink)
                                         .frame(width: 42, height: 42)
-                                        .background(GoopStyle.lime, in: RoundedRectangle(cornerRadius: 13))
+                                        .background(GoopStyle.ember, in: RoundedRectangle(cornerRadius: 13))
                                     VStack(alignment: .leading, spacing: 6) {
                                         Text(workout.name).font(.system(size: 15, weight: .semibold, design: .rounded))
                                         Text(workout.startTime.formatted(date: .abbreviated, time: .shortened))
@@ -26,11 +28,14 @@ struct WorkoutsView: View {
                                         Text(summary(workout)).font(.system(size: 11, design: .rounded)).foregroundStyle(GoopStyle.muted)
                                     }
                                     Spacer(minLength: 4)
-                                    Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(GoopStyle.muted)
+                                    VStack(spacing: 5) {
+                                        Image(systemName: "arrow.up.right").font(.system(size: 10, weight: .bold))
+                                        Text("OPEN").font(.system(size: 7, weight: .bold, design: .rounded)).tracking(0.5)
+                                    }.foregroundStyle(GoopStyle.terracotta)
                                 }
                             }
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(GoopCardPressStyle())
                     }
                 }
                 Text("Workout sessions are recorded by your connected device and provided by Google Health.")
@@ -38,7 +43,9 @@ struct WorkoutsView: View {
             }
             .padding(.horizontal, 20).padding(.top, 16)
         }
-        .background(GoopStyle.canvas)
+        .background(GoopStyle.backgroundGradient)
+        .toolbar { GoopRefreshToolbarButton { await refresh() } }
+        .refreshable { await refresh() }
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -90,7 +97,7 @@ private struct WorkoutDetailView: View {
             }
             .padding(.horizontal, 20).padding(.top, 16)
         }
-        .background(GoopStyle.canvas)
+        .background(GoopStyle.backgroundGradient)
         .navigationBarTitleDisplayMode(.inline)
     }
 
