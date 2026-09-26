@@ -216,8 +216,8 @@ async function listDataPoints(accessToken, dataType, startFilter = null) {
     const response = await fetch(endpoint, { headers: { authorization: `Bearer ${accessToken}`, accept: 'application/json' } });
     const result = await response.json();
     if (!response.ok) {
-      const message = result.error?.message ?? `Google Health API request failed (${response.status}).`;
-      throw new Error(message);
+      const message = result.error?.message ?? `request failed (${response.status})`;
+      throw new Error(`Google Health ${dataType} request failed: ${message}`);
     }
     all.push(...(result.dataPoints ?? []));
     pageToken = result.nextPageToken ?? '';
@@ -237,7 +237,9 @@ async function listDailyRollups(accessToken, dataType, startDate, endDate) {
     const body = {
       range: { start: dateValue(startDate), end: dateValue(endDate) },
       windowSizeDays: 1,
-      pageSize: 10000,
+      // Google limits the product of page size and window size to its
+      // maximum rollup duration (90 days for steps and active-zone-minutes).
+      pageSize: 90,
       ...(pageToken ? { pageToken } : {}),
     };
     const response = await fetch(endpoint, {
@@ -247,8 +249,8 @@ async function listDailyRollups(accessToken, dataType, startDate, endDate) {
     });
     const result = await response.json();
     if (!response.ok) {
-      const message = result.error?.message ?? `Google Health daily rollup failed (${response.status}).`;
-      throw new Error(message);
+      const message = result.error?.message ?? `request failed (${response.status})`;
+      throw new Error(`Google Health ${dataType} daily rollup failed: ${message}`);
     }
     all.push(...(result.rollupDataPoints ?? []));
     pageToken = result.nextPageToken ?? '';
@@ -294,7 +296,8 @@ async function makeSnapshot(account) {
   const from = shiftedDate(today, -35);
   const through = shiftedDate(today, 2);
   const sleepFilter = `sleep.interval.civil_end_time >= "${from}"`;
-  const exerciseFilter = `exercise.interval.start_time >= "${from}T00:00:00Z"`;
+  // Exercise is session data; its supported list filter is civil_start_time.
+  const exerciseFilter = `exercise.interval.civil_start_time >= "${from}"`;
   const [stepDays, azmDays, rhr, hrv, sleep, exercise] = await Promise.all([
     listDailyRollups(accessToken, 'steps', from, through),
     listDailyRollups(accessToken, 'active-zone-minutes', from, through),
